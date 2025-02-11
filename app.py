@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 import cv2
 import torch
-import face_recognition
+#import face_recognition
 import numpy as np
 from io import BytesIO
 import base64
