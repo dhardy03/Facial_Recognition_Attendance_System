@@ -1,20 +1,20 @@
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import cv2
-import torch
-#import face_recognition
 import numpy as np
 from io import BytesIO
 import base64
+from yolo import load_yolo_model, detect_and_recognize_faces, load_known_faces
 
 app = Flask(__name__)
 
-# Load YOLOv5 model
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
+# Enable CORS for all routes
+CORS(app)
 
-# Dummy known faces for recognition (modify as needed)
-known_face_encodings = ["known_faces/Dan.png"]  # You would load actual encodings here
-known_face_names = ['Dan']  # Corresponding names for recognition
-
+# Load YOLO model and known faces
+model = load_yolo_model()
+folder_path = "known_faces"  # Path to folder containing known face images
+known_face_encodings, known_face_names = load_known_faces(folder_path)
 
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
@@ -24,20 +24,14 @@ def process_frame():
     np_img = np.frombuffer(img_data, dtype=np.uint8)
     frame = cv2.imdecode(np_img, 1)  # Decode image from buffer
 
-    # Convert to RGB as YOLO expects RGB format
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # Perform face detection and recognition
+    detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names)
 
-    # YOLO detection
-    results = model(frame_rgb)
-    detections = results.pandas().xyxy[0]
-
-    # Face recognition logic (assuming detected faces are recognized correctly)
-    # Return the processed frame as a base64 string to the frontend
-    _, buffer = cv2.imencode('.jpg', frame)  # Encode the frame back to image
+    # Encode the processed frame back to image
+    _, buffer = cv2.imencode('.jpg', detected_frame)  # Encode the frame back to image
     encoded_img = base64.b64encode(buffer).decode('utf-8')
 
     return jsonify({'image': encoded_img})
-
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
