@@ -1,5 +1,7 @@
+from _mysql_connector import MySQL
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_mysqldb import MySQL
 import cv2
 import numpy as np
 from io import BytesIO
@@ -7,6 +9,13 @@ import base64
 from yolo import load_yolo_model, detect_and_recognize_faces, load_known_faces
 
 app = Flask(__name__)
+
+# Configure MySQL connection
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'dan'
+app.config['MYSQL_PASSWORD'] = '12345678'
+app.config['MYSQL_DB'] = 'face_recognition'
+mysql = MySQL(app)
 
 # Enable CORS for all routes
 CORS(app)
@@ -31,7 +40,12 @@ def process_frame():
     _, buffer = cv2.imencode('.jpg', detected_frame)  # Encode the frame back to image
     encoded_img = base64.b64encode(buffer).decode('utf-8')
 
-    return jsonify({'image': encoded_img})
+    # Interact with the database
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM users")
+    results = cur.fetchall()
+
+    return jsonify({'image': encoded_img}), jsonify(results)
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
