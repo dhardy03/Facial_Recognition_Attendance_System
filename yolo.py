@@ -4,6 +4,7 @@ import torch
 import cv2
 import numpy as np
 import pandas
+from database import save_face_db, get_db_connection
 
 def load_yolo_model():
     """
@@ -13,6 +14,43 @@ def load_yolo_model():
     model = torch.hub.load('ultralytics/yolov5', 'yolov5s')  # Use yolov5s or any desired YOLOv5 model
     print("Model loaded successfully.")
     return model
+
+def get_student_id_from_name(student_name):
+    """
+    Get the student ID from the database based on their name.
+
+    Parameters:
+        student_name (str): The name of the student.
+
+    Returns:
+        student_id (int or None): The student ID or None if not found.
+    """
+    # Split the name assuming the filename is in "firstname_lastname.png" format
+    name_parts = student_name.split('_')
+    if len(name_parts) < 2:
+        print(f"Invalid filename format: {student_name}")
+        return None
+
+    first_name = name_parts[0]
+    last_name = name_parts[1].split('.')[0]  # Remove the file extension
+
+    # Connect to the database
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    # Query to get the student ID by their first and last name
+    cursor.execute("SELECT id FROM students WHERE first_name = %s AND last_name = %s", (first_name, last_name))
+    result = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    if result:
+        return result[0]  # Return the student ID
+    else:
+        print(f"Warning: Student {first_name} {last_name} not found in the database.")
+        return None  # Return None if the student is not found
+
 
 def load_known_faces(folder_path):
     """
@@ -24,10 +62,12 @@ def load_known_faces(folder_path):
     Returns:
         known_face_encodings: List of face encodings.
         known_face_names: List of names corresponding to the face encodings.
+        known_face_ids: List of student IDs corresponding to the face encodings.
     """
     print(f"Loading known faces from folder: {folder_path}")
     known_face_encodings = []
     known_face_names = []
+    known_face_ids = []  # Initialize the list for student IDs
 
     for file_name in os.listdir(folder_path):
         if file_name.endswith('.png'):
@@ -37,14 +77,19 @@ def load_known_faces(folder_path):
             image = face_recognition.load_image_file(image_path)
             encoding = face_recognition.face_encodings(image)
 
-            if encoding:  # Ensure at least one face encoding was found
+            # Get the student ID from the file name
+            student_id = get_student_id_from_name(file_name)
+
+            if encoding and student_id is not None:  # Ensure both encoding and student ID are found
                 known_face_encodings.append(encoding[0])
-                known_face_names.append(os.path.splitext(file_name)[0])  # Use the file name (without extension) as the name
+                known_face_names.append(os.path.splitext(file_name)[0])  # Use file name as face name
+                known_face_ids.append(student_id)  # Add student ID to the list
             else:
-                print(f"No face found in file: {file_name}")
+                print(f"No face encoding or student ID found for file: {file_name}")
 
     print(f"Loaded {len(known_face_encodings)} known faces.")
-    return known_face_encodings, known_face_names
+    return known_face_encodings, known_face_names, known_face_ids
+
 
 def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names, conf_threshold=0.5):
     """
@@ -105,14 +150,21 @@ def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_na
                         name = "Unknown"
 
                         # Use the name of the best match if any match is found
+                        # Inside detect_and_recognize_faces() function
                         if True in matches:
                             match_index = matches.index(True)
                             name = known_face_names[match_index]
-                            print(f"Match found: {name}")
+                            student_id = known_face_ids[match_index]  # Get the student ID for the recognized student
 
-                        # Draw bounding box and label
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            # Save the face to the database
+                            if student_id:
+                                save_face_db(student_id,
+                                             face_encoding)  # Call the function to save the recognized face to DB
+
+                            # Add bounding box and label
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
                     else:
                         print("No face encoding found for the cropped face.")
                 else:
@@ -120,3 +172,48 @@ def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_na
 
     print("Face detection and recognition complete.")
     return frame
+
+def main():
+    # Load the YOLOv5 model
+    model = load_yolo_model()
+
+    # Load known faces
+    folder_path = "known_faces"  # Path to folder containing PNG images of known faces
+    known_face_encodings, known_face_names, known_face_ids = load_known_faces(folder_path)
+
+    # Open a connection to the webcam (camera index 0)
+    print("Accessing webcam...")
+    cap = cv2.VideoCapture(0)  # Change index if you have multiple cameras
+
+    if not cap.isOpened():
+        print("Error: Unable to access the webcam.")
+        return
+
+    print("Webcam access successful. Starting live detection...")
+
+    try:
+        while True:
+            # Capture a single frame from the webcam
+            ret, frame = cap.read()
+            if not ret:
+                print("Error: Unable to read frame from webcam.")
+                break
+
+            # Perform face detection and recognition
+            print("Processing a new frame...")
+            detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names)
+
+            # Display the live feed with detections
+            cv2.imshow("YOLOv5 Face Detection and Recognition", detected_frame)
+
+            # Break the loop if the user presses 'q'
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                print("Quitting...")
+                break
+    finally:
+        # Release resources
+        print("Releasing resources...")
+        cap.release()
+        cv2.destroyAllWindows()
+
+main()
