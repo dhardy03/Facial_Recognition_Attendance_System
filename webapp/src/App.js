@@ -1,29 +1,26 @@
-// App.js
 import React from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-
-// Import page components
-import Attendance from "./Attendance/Attendance";
-import RegisterStudent from "./Register/RegisterStudent";
+import { BrowserRouter as Router, Route, Routes, Link } from "react-router-dom";
+import Home from "./pages/Home.js";
+import Register from "./pages/Register.js";
+import Recognition from "./pages/Recognition.js";
+import "./App.css";
 
 function App() {
   return (
     <Router>
-      <div>
-        <h1>Facial Recognition Attendance System</h1>
-
-        {/* Define Navigation Links */}
+      console.log("App is rendering...");
+      <div className="app">
         <nav>
           <ul>
-            <li><a href="/">Attendance</a></li>
-            <li><a href="/">Register Student</a></li>
+            <li><Link to="/home">Home</Link></li>
+            <li><Link to="/register">Register</Link></li>
+            <li><Link to="/recognition">Face Recognition</Link></li>
           </ul>
         </nav>
-
-        {/* Define Routes */}
         <Routes>
-          <Route path="/Attendance" element={<Attendance />} />
-          <Route path="/RegisterStudent" element={<RegisterStudent />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/recognition" element={<Recognition />} />
         </Routes>
       </div>
     </Router>

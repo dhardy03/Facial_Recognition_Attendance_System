@@ -4,6 +4,7 @@ import torch
 import cv2
 import numpy as np
 import pandas
+
 from database import save_face_db, get_db_connection
 
 def load_yolo_model():
@@ -91,7 +92,7 @@ def load_known_faces(folder_path):
     return known_face_encodings, known_face_names, known_face_ids
 
 
-def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names, conf_threshold=0.5):
+def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names, known_face_ids, conf_threshold=0.5):
     """
     Detect faces in a video frame using YOLO and recognize them by comparing with known faces.
 
@@ -158,8 +159,7 @@ def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_na
 
                             # Save the face to the database
                             if student_id:
-                                save_face_db(student_id,
-                                             face_encoding)  # Call the function to save the recognized face to DB
+                                save_face_db(student_id, face_encoding)  # Call the function to save the recognized face to DB
 
                             # Add bounding box and label
                             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)

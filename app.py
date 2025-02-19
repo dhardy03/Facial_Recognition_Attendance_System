@@ -9,11 +9,14 @@ import face_recognition
 from yolo import load_yolo_model, detect_and_recognize_faces, load_known_faces
 from database import get_db_connection, save_face_db
 
-
 app = Flask(__name__)
 
 # Enable CORS for all routes
 CORS(app)
+
+# Define the folder where uploaded images will be stored
+UPLOAD_FOLDER = "known_faces"  # Change this to your actual folder path
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Load YOLO model and known faces
 model = load_yolo_model()
@@ -77,7 +80,7 @@ def process_frame():
     frame = cv2.imdecode(np_img, 1)  # Decode image from buffer
 
     # Perform face detection and recognition
-    detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names)
+    detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names, known_face_ids)
 
     # Encode the processed frame back to image
     _, buffer = cv2.imencode('.jpg', detected_frame)  # Encode the frame back to image

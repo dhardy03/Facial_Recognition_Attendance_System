@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import axios from 'axios';
 
-const Attendance = () => {
+const Recognition = () => {
   const [videoStream, setVideoStream] = useState(null);
   const [processedImage, setProcessedImage] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false); // To manage processing state
@@ -39,15 +39,19 @@ const Attendance = () => {
 
     // Send the image data to the Flask backend for processing
     axios
-      .post("http://localhost:5000/process_frame", { image: imageData.split(',')[1] })
-      .then((response) => {
-        setProcessedImage(response.data.image); // Set the processed image
-        setIsProcessing(false); // Reset processing state
-      })
-      .catch((error) => {
-        console.error("Error processing the image:", error);
-        setIsProcessing(false); // Reset processing state on error
-      });
+  .post("http://localhost:5000/process_frame", { image: imageData.split(',')[1] })
+  .then((response) => {
+    if (!response.data.image) {
+      console.error("No image received from server");
+    } else {
+      setProcessedImage(response.data.image);
+    }
+    setIsProcessing(false);
+  })
+  .catch((error) => {
+    console.error("Error processing the image:", error);
+    setIsProcessing(false);
+  });
   };
 
   return (
@@ -67,4 +71,4 @@ const Attendance = () => {
   );
 };
 
-export default Attendance;
+export default Recognition;
