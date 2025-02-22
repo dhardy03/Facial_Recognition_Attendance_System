@@ -2,9 +2,7 @@ import os
 import face_recognition
 import torch
 import cv2
-import numpy as np
-import pandas
-
+import mysql
 from database import save_face_db, get_db_connection
 
 def load_yolo_model():
@@ -26,7 +24,6 @@ def get_student_id_from_name(student_name):
     Returns:
         student_id (int or None): The student ID or None if not found.
     """
-    # Split the name assuming the filename is in "firstname_lastname.png" format
     name_parts = student_name.split('_')
     if len(name_parts) < 2:
         print(f"Invalid filename format: {student_name}")
@@ -35,23 +32,25 @@ def get_student_id_from_name(student_name):
     first_name = name_parts[0]
     last_name = name_parts[1].split('.')[0]  # Remove the file extension
 
-    # Connect to the database
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # Query to get the student ID by their first and last name
-    cursor.execute("SELECT id FROM students WHERE first_name = %s AND last_name = %s", (first_name, last_name))
-    result = cursor.fetchone()
+    try:
+        cursor.execute("SELECT id FROM students WHERE first_name = %s AND last_name = %s", (first_name, last_name))
+        result = cursor.fetchone()
 
-    cursor.close()
-    connection.close()
+        # Fetch all results before closing cursor to avoid 'Unread result found' error
+        cursor.fetchall()
 
-    if result:
-        return result[0]  # Return the student ID
-    else:
-        print(f"Warning: Student {first_name} {last_name} not found in the database.")
-        return None  # Return None if the student is not found
+        return result[0] if result else None
 
+    except mysql.connector.Error as err:
+        print(f"Database error: {err}")
+        return None
+
+    finally:
+        cursor.close()
+        connection.close()
 
 def load_known_faces(folder_path):
     """
@@ -101,6 +100,7 @@ def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_na
         frame: A single frame from the video feed.
         known_face_encodings: List of known face encodings.
         known_face_names: List of names corresponding to known face encodings.
+        known_face_ids: List of student IDs corresponding to the known face encodings.
         conf_threshold: Confidence threshold for filtering weak detections.
 
     Returns:
@@ -148,7 +148,6 @@ def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_na
                         # Compare the detected face to known faces
                         matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
                         print(f"Face matches: {matches}")
-                        name = "Unknown"
 
                         # Use the name of the best match if any match is found
                         # Inside detect_and_recognize_faces() function
@@ -174,46 +173,15 @@ def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_na
     return frame
 
 def main():
-    # Load the YOLOv5 model
+    print("Loading YOLO model...")
     model = load_yolo_model()
 
-    # Load known faces
-    folder_path = "known_faces"  # Path to folder containing PNG images of known faces
+    folder_path = "known_faces"
     known_face_encodings, known_face_names, known_face_ids = load_known_faces(folder_path)
 
-    # Open a connection to the webcam (camera index 0)
-    print("Accessing webcam...")
-    cap = cv2.VideoCapture(0)  # Change index if you have multiple cameras
+    print("Ready for face detection...")
 
-    if not cap.isOpened():
-        print("Error: Unable to access the webcam.")
-        return
+# Ensure `main()` only runs when `yolo.py` is executed directly
+if __name__ == "__main__":
+    main()
 
-    print("Webcam access successful. Starting live detection...")
-
-    try:
-        while True:
-            # Capture a single frame from the webcam
-            ret, frame = cap.read()
-            if not ret:
-                print("Error: Unable to read frame from webcam.")
-                break
-
-            # Perform face detection and recognition
-            print("Processing a new frame...")
-            detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names)
-
-            # Display the live feed with detections
-            cv2.imshow("YOLOv5 Face Detection and Recognition", detected_frame)
-
-            # Break the loop if the user presses 'q'
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                print("Quitting...")
-                break
-    finally:
-        # Release resources
-        print("Releasing resources...")
-        cap.release()
-        cv2.destroyAllWindows()
-
-main()

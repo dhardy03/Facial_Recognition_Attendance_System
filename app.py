@@ -15,7 +15,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Define the folder where uploaded images will be stored
-UPLOAD_FOLDER = "known_faces"  # Change this to your actual folder path
+UPLOAD_FOLDER = "known_faces"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Load YOLO model and known faces
