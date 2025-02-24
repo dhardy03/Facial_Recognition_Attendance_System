@@ -4,6 +4,7 @@ import axios from "axios";
 function Register() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [studentNumber, setStudentNumber] = useState("");
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -14,7 +15,7 @@ function Register() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !photo) {
+    if (!firstName || !lastName || !photo || !studentNumber) {
       setMessage("Please fill all fields and upload a photo.");
       return;
     }
@@ -22,14 +23,16 @@ function Register() {
     const formData = new FormData();
     formData.append("first_name", firstName);
     formData.append("last_name", lastName);
+    formData.append("student_number", studentNumber);
     formData.append("image", photo);
+
 
     setLoading(true);
     setMessage("");
-    
+
     try {
       const response = await axios.post("http://localhost:5000/register_student", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {"Content-Type": "multipart/form-data"},
       });
       setMessage(response.data.message);
     } catch (error) {
@@ -39,29 +42,37 @@ function Register() {
   };
 
   return (
-    <div>
-      <h2>Register Student</h2>
-      <form onSubmit={handleRegister}>
-        <input
-          type="text"
-          placeholder="First Name"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Last Name"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          required
-        />
-        <input type="file" accept="image/*" onChange={handlePhotoChange} required />
-        <button type="submit" disabled={loading}>{loading ? "Registering..." : "Register"}</button>
-      </form>
-      {message && <p>{message}</p>}
-    </div>
+      <div>
+        <h2>Register Student</h2>
+        <form onSubmit={handleRegister}>
+          <input
+              type="text"
+              placeholder="First Name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+          />
+          <input
+              type="text"
+              placeholder="Last Name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+          />
+          <input
+            type="text"
+            placeholder="Student Number"
+            value={studentNumber}
+            onChange={(e) => setStudentNumber(e.target.value)}
+            required
+            />
+          <input type="file" accept="image/*" onChange={handlePhotoChange} required/>
+          <button type="submit" disabled={loading}>{loading ? "Registering..." : "Register"} </button>
+        </form>
+        {message && <p>{message}</p>}
+      </div>
   );
 }
+
 
 export default Register;
