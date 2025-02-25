@@ -6,6 +6,7 @@ import mysql.connector
 import base64
 import os
 import face_recognition
+from PIL import Image
 from yolo import load_yolo_model, detect_and_recognize_faces, load_known_faces
 from database import get_db_connection, save_face_db
 
@@ -18,75 +19,144 @@ CORS(app)
 UPLOAD_FOLDER = "known_faces"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Load YOLO model and known faces
-model = load_yolo_model()
-folder_path = "known_faces"  # Path to folder containing known face images
-known_face_encodings, known_face_names, known_face_ids = load_known_faces(folder_path)
+# Ensure the folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-@app.route('/register_student', methods=['POST'])
-def register_student():
-    first_name = request.form['first_name']
-    last_name = request.form['last_name']
-    image_file = request.files['image']
+# Load YOLO model and known faces only when needed
+model = None
+known_face_encodings = []
+known_face_names = []
+known_face_ids = []
 
-    if not image_file:
-        return jsonify({"error": "No image file provided"}), 400
 
-    # Save image temporarily
-    filename = f"{first_name}_{last_name}.png"
-    image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    image_file.save(image_path)
+def load_face_recognition():
+    global model, known_face_encodings, known_face_names, known_face_ids
+    if model is None:
+        model = load_yolo_model()
+    update_face_recognition()
 
-    # Load image and extract face encoding
-    image = face_recognition.load_image_file(image_path)
-    encodings = face_recognition.face_encodings(image)
 
-    if not encodings:
-        return jsonify({"error": "No face found in image"}), 400
+def update_face_recognition():
+    global known_face_encodings, known_face_names, known_face_ids
+    known_face_encodings = []
+    known_face_names = []
+    known_face_ids = []
 
-    face_encoding = encodings[0]  # Take the first face found
-
-    # Save student in database
     connection = get_db_connection()
     cursor = connection.cursor()
+    cursor.execute("SELECT student_number, first_name, last_name FROM students")
+    students = cursor.fetchall()
+    cursor.close()
+    connection.close()
 
+    for student_number, first_name, last_name in students:
+        image_path = os.path.join(UPLOAD_FOLDER, f"{student_number}.png")
+        if os.path.exists(image_path):
+            image = face_recognition.load_image_file(image_path)
+            encodings = face_recognition.face_encodings(image)
+            if encodings:
+                known_face_encodings.append(encodings[0])
+                known_face_names.append(f"{first_name} {last_name}")
+                known_face_ids.append(student_number)
+
+
+@app.route('/')
+def home():
+    return jsonify({"message": "Welcome to the Facial Recognition System API"})
+
+
+@app.route('/register', methods=['POST'])
+def register_student():
     try:
-        cursor.execute(
-            "INSERT INTO students (first_name, last_name) VALUES (%s, %s)",
-            (first_name, last_name)
-        )
-        student_id = cursor.lastrowid  # Get the generated student ID
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        student_number = request.form.get('student_number', '').strip()
+        image_file = request.files.get('image')
 
-        save_face_db(student_id, face_encoding)
+        if not first_name or not last_name or not student_number:
+            return jsonify({"error": "Missing required fields"}), 400
 
-        connection.commit()
-        cursor.close()
-        connection.close()
+        if not image_file:
+            return jsonify({"error": "No image file provided"}), 400
 
-        return jsonify({"message": "Student registered successfully!"}), 201
+        # Save image temporarily
+        filename = f"{student_number}.png"
+        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        image_file.save(image_path)
 
-    except mysql.connector.Error as err:
-        return jsonify({"error": str(err)}), 400
+        # Validate the image before processing
+        try:
+            with Image.open(image_path) as img:
+                img.verify()
+        except Exception:
+            os.remove(image_path)
+            return jsonify({"error": "Uploaded file is not a valid image"}), 400
 
-    finally:
-        connection.close()
+        # Load image and extract face encoding
+        image = face_recognition.load_image_file(image_path)
+        encodings = face_recognition.face_encodings(image)
 
-@app.route('/process_frame', methods=['POST'])
+        if not encodings:
+            os.remove(image_path)
+            return jsonify({"error": "No face found in image"}), 400
+
+        face_encoding = encodings[0]
+
+        # Save student in database
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        try:
+            cursor.execute(
+                "INSERT INTO students (first_name, last_name, student_number) VALUES (%s, %s, %s)",
+                (first_name, last_name, student_number)
+            )
+            student_id = cursor.lastrowid
+            save_face_db(student_id, face_encoding)
+            connection.commit()
+
+            # Update facial recognition after new registration
+            update_face_recognition()
+
+            return jsonify({"message": "Student registered successfully! Facial recognition updated."}), 201
+        except mysql.connector.Error as err:
+            connection.rollback()
+            return jsonify({"error": str(err)}), 500
+        finally:
+            cursor.close()
+            connection.close()
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/recognition', methods=['POST'])
 def process_frame():
-    # Get the image from the POST request
-    data = request.json
-    img_data = base64.b64decode(data['image'])  # Get the image from frontend
-    np_img = np.frombuffer(img_data, dtype=np.uint8)
-    frame = cv2.imdecode(np_img, 1)  # Decode image from buffer
+    try:
+        data = request.json
+        if data.get('page') != 'recognition':
+            return jsonify({"error": "Face recognition is only available on the recognition page"}), 400
 
-    # Perform face detection and recognition
-    detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names, known_face_ids)
+        load_face_recognition()
 
-    # Encode the processed frame back to image
-    _, buffer = cv2.imencode('.jpg', detected_frame)  # Encode the frame back to image
-    encoded_img = base64.b64encode(buffer).decode('utf-8')
+        img_data = base64.b64decode(data.get('image', ''))
+        if not img_data:
+            return jsonify({"error": "No image data provided"}), 400
 
-    return jsonify({'image': encoded_img})
+        np_img = np.frombuffer(img_data, dtype=np.uint8)
+        frame = cv2.imdecode(np_img, 1)
+
+        detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names,
+                                                    known_face_ids)
+
+        _, buffer = cv2.imencode('.jpg', detected_frame)
+        encoded_img = base64.b64encode(buffer).decode('utf-8')
+
+        return jsonify({'image': encoded_img})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -1,5 +1,5 @@
 import mysql.connector
-import pickle  # ✅ Import pickle to serialize NumPy arrays
+import pickle
 
 def get_db_connection():
     connection = mysql.connector.connect(

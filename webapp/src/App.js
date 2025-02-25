@@ -8,7 +8,6 @@ import "./App.css";
 function App() {
   return (
     <Router>
-      console.log("App is rendering...");
       <div className="app">
         <nav>
           <ul>

@@ -39,7 +39,7 @@ const Recognition = () => {
 
     // Send the image data to the Flask backend for processing
     axios
-  .post("http://localhost:5000/process_frame", { image: imageData.split(',')[1] })
+  .post("http://localhost:5000/recognition", { page: "recognition", image: imageData.split(',')[1] })
   .then((response) => {
     if (!response.data.image) {
       console.error("No image received from server");
