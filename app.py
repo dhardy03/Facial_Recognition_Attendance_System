@@ -137,26 +137,64 @@ def process_frame():
         if data.get('page') != 'recognition':
             return jsonify({"error": "Face recognition is only available on the recognition page"}), 400
 
+        class_id = data.get('class_id')
+        if not class_id:
+            return jsonify({"error": "Class ID is required for enrollment"}), 400
+
         load_face_recognition()
 
         img_data = base64.b64decode(data.get('image', ''))
         if not img_data:
-            return jsonify({"error": "No image data provided"}), 400
+            print("ERROR: No image data received.")
+            return jsonify({"error": "Invalid image data"}), 400
 
         np_img = np.frombuffer(img_data, dtype=np.uint8)
         frame = cv2.imdecode(np_img, 1)
+        if frame is None:
+            print("ERROR: Failed to decode image.")
+            return jsonify({"error": "Failed to decode image"}), 400
 
-        detected_frame = detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names,
-                                                    known_face_ids)
+        processed_image_base64, recognized_students = detect_and_recognize_faces(model, frame, known_face_encodings,
+                                                                                 known_face_names, known_face_ids)
 
-        _, buffer = cv2.imencode('.jpg', detected_frame)
-        encoded_img = base64.b64encode(buffer).decode('utf-8')
+        if not processed_image_base64:
+            print("ERROR: Processed image encoding failed.")
+            return jsonify({"error": "Failed to process image"}), 500
 
-        return jsonify({'image': encoded_img})
+        connection = get_db_connection()
+        cursor = connection.cursor()
 
+        enrolled_students = []
+        for student_number in recognized_students:
+            cursor.execute("SELECT id, first_name, last_name FROM students WHERE student_number = %s",
+                           (student_number,))
+            student = cursor.fetchone()
+            if student:
+                student_id, first_name, last_name = student
+                full_name = f"{first_name} {last_name}"
+                cursor.execute("SELECT student_number FROM enrollments WHERE student_number = %s AND class_id = %s",
+                               (student_number, class_id))
+                existing_enrollment = cursor.fetchone()
+
+                if not existing_enrollment:
+                    cursor.execute(
+                        "INSERT INTO enrollments (student_id, student_number, class_id, date) VALUES (%s, %s, %s, NOW())",
+                        (student_id, student_number, class_id))
+                    connection.commit()
+                    enrolled_students.append({"name": full_name, "number": student_number})
+
+        cursor.close()
+        connection.close()
+
+        print("Processed image successfully generated and sent.")
+        return jsonify({
+            'message': "Recognition processed and enrollments updated.",
+            'recognized_students': enrolled_students,
+            'image': processed_image_base64
+        })
     except Exception as e:
+        print(f"ERROR: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
