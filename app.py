@@ -196,5 +196,15 @@ def process_frame():
         print(f"ERROR: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/classes', methods=['GET'])
+def get_classes():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, name FROM classes")
+    classes = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    return jsonify({"classes": [{"id": row[0], "name": row[1]} for row in classes]})
+
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
