@@ -206,5 +206,49 @@ def get_classes():
     connection.close()
     return jsonify({"classes": [{"id": row[0], "name": row[1]} for row in classes]})
 
+@app.route('/analytics/<int:student_id>', methods=['GET'])
+def get_student_attendance(student_id):
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        # Fetch attendance data with class names
+        cursor.execute("""
+            SELECT enrollments.date, classes.name 
+            FROM enrollments 
+            JOIN classes ON enrollments.class_id = classes.id 
+            WHERE enrollments.student_number = %s 
+            ORDER BY enrollments.date ASC
+        """, (student_id,))
+
+        attendance_records = cursor.fetchall()
+        cursor.close()
+        connection.close()
+
+        return jsonify([
+            {"date": record[0].strftime('%Y-%m-%d'), "class_name": record[1]}
+            for record in attendance_records
+        ])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/students', methods=['GET'])
+def get_students():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("SELECT student_number, first_name, last_name FROM students")
+    students = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return jsonify([
+        {"id": student[0], "name": f"{student[1]} {student[2]}"}
+        for student in students
+    ])
+
+
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
