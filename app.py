@@ -206,31 +206,38 @@ def get_classes():
     connection.close()
     return jsonify({"classes": [{"id": row[0], "name": row[1]} for row in classes]})
 
-@app.route('/analytics/<int:student_id>', methods=['GET'])
-def get_student_attendance(student_id):
+@app.route('/analytics', methods=['GET'])
+def get_attendance_summary():
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
 
-        # Fetch attendance data with class names
         cursor.execute("""
-            SELECT enrollments.date, classes.name 
-            FROM enrollments 
-            JOIN classes ON enrollments.class_id = classes.id 
-            WHERE enrollments.student_number = %s 
-            ORDER BY enrollments.date ASC
-        """, (student_id,))
+            SELECT classes.name AS class_name, students.first_name, students.last_name, COUNT(*) AS total_attendance
+            FROM enrollments
+            JOIN students ON enrollments.student_number = students.student_number
+            JOIN classes ON enrollments.class_id = classes.id
+            GROUP BY classes.name, students.first_name, students.last_name
+            ORDER BY classes.name
+        """)
 
-        attendance_records = cursor.fetchall()
+        records = cursor.fetchall()
         cursor.close()
         connection.close()
 
-        return jsonify([
-            {"date": record[0].strftime('%Y-%m-%d'), "class_name": record[1]}
-            for record in attendance_records
-        ])
+        # Transform data into dictionary format suitable for recharts
+        attendance_data = {}
+        for class_name, first_name, last_name, total_attendance in records:
+            student_name = f"{first_name} {last_name}"
+            if class_name not in attendance_data:
+                attendance_data[class_name] = {"class_name": class_name}
+            attendance_data[class_name][student_name] = total_attendance
+
+        return jsonify(list(attendance_data.values()))
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/students', methods=['GET'])
