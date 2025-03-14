@@ -238,6 +238,31 @@ def get_attendance_summary():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/analytics/students', methods=['GET'])
+def get_attendance_by_student():
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT students.student_number, students.first_name, students.last_name, COUNT(*) AS total_attendance
+            FROM enrollments
+            JOIN students ON enrollments.student_number = students.student_number
+            GROUP BY students.student_number, students.first_name, students.last_name
+            ORDER BY total_attendance DESC
+        """)
+
+        records = cursor.fetchall()
+        cursor.close()
+        connection.close()
+
+        return jsonify([
+            {"id": student_number, "name": f"{first_name} {last_name}", "attendance": total_attendance}
+            for student_number, first_name, last_name, total_attendance in records
+        ])
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/students', methods=['GET'])
@@ -255,6 +280,31 @@ def get_students():
         {"id": student[0], "name": f"{student[1]} {student[2]}"}
         for student in students
     ])
+
+@app.route('/analytics/<int:student_id>', methods=['GET'])
+def get_student_attendance(student_id):
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT enrollments.date, classes.name 
+            FROM enrollments 
+            JOIN classes ON enrollments.class_id = classes.id 
+            WHERE enrollments.student_number = %s 
+            ORDER BY enrollments.date ASC
+        """, (student_id,))
+
+        attendance_records = cursor.fetchall()
+        cursor.close()
+        connection.close()
+
+        return jsonify([
+            {"date": record[0].strftime('%Y-%m-%d'), "class_name": record[1]}
+            for record in attendance_records
+        ])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
