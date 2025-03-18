@@ -81,42 +81,71 @@ const Recognition = () => {
   };
 
   return (
-    <div>
-      <h1>Face Detection and Recognition</h1>
-      <video ref={videoRef} autoPlay playsInline width="640" height="480"></video>
+      <div className="container text-center py-5">
+        <h1 className="mb-4">Face Detection and Recognition</h1>
 
-      <div>
-        <label>Select Class: </label>
-        <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
-          <option value="">--Choose a class--</option>
-          {classOptions.map((classItem) => (
-            <option key={classItem.id} value={classItem.id}>{classItem.name}</option>
-          ))}
-        </select>
+        <div className="d-flex justify-content-center">
+          <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              width="640"
+              height="480"
+              className="border rounded shadow"
+          ></video>
+        </div>
+
+        <div className="mt-4">
+          <label className="form-label me-2">Select Class: </label>
+          <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="form-select d-inline-block w-auto"
+          >
+            <option value="">--Choose a class--</option>
+            {classOptions.map((classItem) => (
+                <option key={classItem.id} value={classItem.id}>
+                  {classItem.name}
+                </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+            className="btn btn-primary mt-3 px-4 py-2"
+            onClick={captureFrame}
+            disabled={isProcessing}
+        >
+          {isProcessing ? "Processing..." : "Capture and Process"}
+        </button>
+
+        {recognizedStudents.length > 0 && (
+            <div className="mt-5">
+              <h2>Recognized and Enrolled Students</h2>
+              <ul className="list-group mx-auto w-50">
+                {recognizedStudents.map((student, index) => (
+                    <li key={index} className="list-group-item">
+                      {student.name} (ID: {student.number}) - Enrolled
+                    </li>
+                ))}
+              </ul>
+            </div>
+        )}
+
+        {processedImage && (
+            <div className="mt-5">
+              <h2>Recognition Results!</h2>
+              <img
+                  src={processedImage}
+                  alt="Processed"
+                  width="640"
+                  height="480"
+                  className="border rounded shadow"
+              />
+            </div>
+        )}
       </div>
 
-      <button onClick={captureFrame} disabled={isProcessing}>
-        {isProcessing ? "Processing..." : "Capture and Process"}
-      </button>
-
-      {recognizedStudents.length > 0 && (
-        <div>
-          <h2>Recognized and Enrolled Students</h2>
-          <ul>
-            {recognizedStudents.map((student, index) => (
-              <li key={index}>{student.name} (ID: {student.number}) - Enrolled</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {processedImage && (
-        <div>
-          <h2>Processed Image</h2>
-          <img src={processedImage} alt="Processed" width="640" height="480" />
-        </div>
-      )}
-    </div>
   );
 };
 

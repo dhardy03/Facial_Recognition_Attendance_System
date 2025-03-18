@@ -36,3 +36,13 @@
     transform: rotate(360deg);
   }
 }
+.Main-Section {
+  background: url('./pages/resources/home_background.jpg') center/cover no-repeat;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-align: center;
+}
