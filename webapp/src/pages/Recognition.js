@@ -82,18 +82,25 @@ const Recognition = () => {
 
   return (
       <div className="container text-center py-5">
+          <div style={{ backgroundColor:"#d30031",
+              color:"white",
+              padding:"20px",
+              borderRadius:"8px",
+              textAlign:"center" }}>
         <h1 className="mb-4">Face Detection and Recognition</h1>
-
-        <div className="d-flex justify-content-center">
-          <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              width="640"
-              height="480"
-              className="border rounded shadow"
-          ></video>
         </div>
+          <div className="bg-light p-4 mt-3 rounded shadow">
+            <div className="d-flex justify-content-center">
+              <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  width="640"
+                  height="480"
+                  className="border rounded shadow"
+              ></video>
+            </div>
+      </div>
 
         <div className="mt-4">
           <label className="form-label me-2">Select Class: </label>
@@ -116,7 +123,7 @@ const Recognition = () => {
             onClick={captureFrame}
             disabled={isProcessing}
         >
-          {isProcessing ? "Processing..." : "Capture and Process"}
+          {isProcessing ? "Processing..." : "Capture"}
         </button>
 
         {recognizedStudents.length > 0 && (
@@ -133,20 +140,22 @@ const Recognition = () => {
         )}
 
         {processedImage && (
-            <div className="mt-5">
-              <h2>Recognition Results!</h2>
-              <img
-                  src={processedImage}
-                  alt="Processed"
-                  width="640"
-                  height="480"
-                  className="border rounded shadow"
-              />
+            <div className="bg-light p-4 mt-3 rounded shadow">
+                <div className="mt-5">
+                    <h2>Recognition Results!</h2>
+                    <img
+                        src={processedImage}
+                        alt="Processed"
+                        width="640"
+                        height="480"
+                        className="border rounded shadow"
+                    />
+                </div>
             </div>
-        )}
-      </div>
+                )}
+            </div>
 
-  );
-};
+        );
+        };
 
-export default Recognition;
+          export default Recognition;
