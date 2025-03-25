@@ -206,106 +206,103 @@ def get_classes():
     connection.close()
     return jsonify({"classes": [{"id": row[0], "name": row[1]} for row in classes]})
 
-@app.route('/analytics', methods=['GET'])
-def get_attendance_summary():
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-
-        cursor.execute("""
-            SELECT classes.name AS class_name, students.first_name, students.last_name, COUNT(*) AS total_attendance
-            FROM enrollments
-            JOIN students ON enrollments.student_number = students.student_number
-            JOIN classes ON enrollments.class_id = classes.id
-            GROUP BY classes.name, students.first_name, students.last_name
-            ORDER BY classes.name
-        """)
-
-        records = cursor.fetchall()
-        cursor.close()
-        connection.close()
-
-        # Transform data into dictionary format suitable for recharts
-        attendance_data = {}
-        for class_name, first_name, last_name, total_attendance in records:
-            student_name = f"{first_name} {last_name}"
-            if class_name not in attendance_data:
-                attendance_data[class_name] = {"class_name": class_name}
-            attendance_data[class_name][student_name] = total_attendance
-
-        return jsonify(list(attendance_data.values()))
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/analytics/students', methods=['GET'])
-def get_attendance_by_student():
+def get_students():
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
 
         cursor.execute("""
-            SELECT students.student_number, students.first_name, students.last_name, COUNT(*) AS total_attendance
+            SELECT id, first_name, last_name FROM students
+        """)
+
+        students = cursor.fetchall()
+        cursor.close()
+        connection.close()
+
+        student_list = [{"student_number": student[0], "first_name": student[1], "last_name": student[2]} for student in students]
+        return jsonify(student_list)
+
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/analytics/overall/<student_number>', methods=['GET'])
+def get_overall_attendance(student_number):
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT enrollments.student_number, COUNT(*) AS attendance_count
             FROM enrollments
-            JOIN students ON enrollments.student_number = students.student_number
-            GROUP BY students.student_number, students.first_name, students.last_name
-            ORDER BY total_attendance DESC
+            WHERE enrollments.student_number = %s
+            GROUP BY enrollments.student_number;
+        """, (student_number,))
+
+        records = cursor.fetchall()
+        cursor.close()
+        connection.close()
+
+        if not records:
+            return jsonify({"message": "No attendance records found for the specified student."}), 404
+
+        attendance_data = [{"student_number": student_number, "attendance_count": count} for student_number, count in records]
+        return jsonify(attendance_data)
+
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/analytics/daily-trends', methods=['GET'])
+def get_daily_trends():
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT DATE(enrollments.date) AS attendance_date, COUNT(*) AS attendance
+            FROM enrollments
+            GROUP BY DATE(enrollments.date)
+            ORDER BY DATE(enrollments.date);
         """)
 
         records = cursor.fetchall()
         cursor.close()
         connection.close()
 
-        return jsonify([
-            {"id": student_number, "name": f"{first_name} {last_name}", "attendance": total_attendance}
-            for student_number, first_name, last_name, total_attendance in records
-        ])
+        trends_data = [{"date": str(date), "attendance": count} for date, count in records]
+        return jsonify(trends_data)
 
     except Exception as e:
+        print("Error:", str(e))
         return jsonify({"error": str(e)}), 500
 
-
-@app.route('/students', methods=['GET'])
-def get_students():
-    connection = get_db_connection()
-    cursor = connection.cursor()
-
-    cursor.execute("SELECT student_number, first_name, last_name FROM students")
-    students = cursor.fetchall()
-
-    cursor.close()
-    connection.close()
-
-    return jsonify([
-        {"id": student[0], "name": f"{student[1]} {student[2]}"}
-        for student in students
-    ])
-
-@app.route('/analytics/<int:student_id>', methods=['GET'])
-def get_student_attendance(student_id):
+@app.route('/analytics/class-wise', methods=['GET'])
+def get_classwise_attendance():
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
 
         cursor.execute("""
-            SELECT enrollments.date, classes.name 
-            FROM enrollments 
-            JOIN classes ON enrollments.class_id = classes.id 
-            WHERE enrollments.student_number = %s 
-            ORDER BY enrollments.date ASC
-        """, (student_id,))
+            SELECT classes.name AS class_name, COUNT(*) AS attendance
+            FROM enrollments
+            JOIN classes ON enrollments.class_id = classes.id
+            GROUP BY classes.name
+            ORDER BY classes.name;
+        """)
 
-        attendance_records = cursor.fetchall()
+        records = cursor.fetchall()
         cursor.close()
         connection.close()
 
-        return jsonify([
-            {"date": record[0].strftime('%Y-%m-%d'), "class_name": record[1]}
-            for record in attendance_records
-        ])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        class_attendance = [{"class_name": class_name, "attendance": count} for class_name, count in records]
+        return jsonify(class_attendance)
 
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
