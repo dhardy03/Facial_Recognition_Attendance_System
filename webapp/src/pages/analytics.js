@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, LineChart, Line} from "recharts";
 
 function AttendanceInsights() {
     const [students, setStudents] = useState([]);
@@ -31,7 +31,6 @@ function AttendanceInsights() {
         }
     }, [selectedStudent]);
 
-    const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#8dd1e1"];
 
     return (
 <div className="container py-5">
@@ -48,35 +47,34 @@ function AttendanceInsights() {
                         value={selectedStudent}
                         onChange={(e) => setSelectedStudent(e.target.value)}
                     >
-                        <option value="">Select a Student</option>
-                        {students.map(student => (
-                            <option key={student.id} value={student.id}>
-                                {student.first_name} {student.last_name}
-                            </option>
-                        ))}
+                    {students.map(student => (
+                    <option key={student.student_number} value={student.student_number}>
+                        {student.first_name} {student.last_name} ({student.student_number})
+                    </option>
+                ))}
                     </select>
                 </div>
             </div>
 
 
-            {/* Student-specific Attendance */}
+
             {studentAttendance && studentAttendance.length > 0 && (
-                <div className="bg-light p-4 mt-3 rounded shadow">
-                    <h3 className="text-center">Attendance for Student {studentAttendance[0].student_number}</h3>
-                    <div className="d-flex justify-content-center">
-                        <PieChart width={400} height={400}>
-                            <Pie data={studentAttendance} dataKey="attendance_count" nameKey="class_name" outerRadius={150} label>
-                                {studentAttendance.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip />
-                        </PieChart>
-                    </div>
+            <div className="bg-light p-4 mt-3 rounded shadow">
+                <h3 className="text-center">Attendance for Student {studentAttendance[0].student_number}</h3>
+                <div className="d-flex justify-content-center">
+                    <BarChart width={600} height={400} data={studentAttendance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="class_name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="attendance_count" fill="#8884d8" />
+                    </BarChart>
                 </div>
+            </div>
             )}
 
-            {/* Daily Attendance Trends */}
+
             <div className="bg-light p-4 mt-3 rounded shadow">
                 <h3 className="text-center">Daily Attendance Trends</h3>
                 {dailyTrends.length > 0 && (

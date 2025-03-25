@@ -211,21 +211,18 @@ def get_students():
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
-
-        cursor.execute("""
-            SELECT id, first_name, last_name FROM students
-        """)
-
+        cursor.execute("SELECT student_number, first_name, last_name FROM students")
         students = cursor.fetchall()
-        cursor.close()
-        connection.close()
-
-        student_list = [{"student_number": student[0], "first_name": student[1], "last_name": student[2]} for student in students]
-        return jsonify(student_list)
-
+        return jsonify([
+            {
+                "student_number": s[0],
+                "first_name": s[1],
+                "last_name": s[2]
+            } for s in students
+        ])
     except Exception as e:
-        print("Error:", str(e))
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/analytics/overall/<student_number>', methods=['GET'])
 def get_overall_attendance(student_number):
@@ -233,11 +230,21 @@ def get_overall_attendance(student_number):
         connection = get_db_connection()
         cursor = connection.cursor()
 
+        # First validate student_number exists
+        cursor.execute("SELECT id FROM students WHERE student_number = %s", (student_number,))
+        student = cursor.fetchone()
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        # Get class attendance using student_number
         cursor.execute("""
-            SELECT enrollments.student_number, COUNT(*) AS attendance_count
-            FROM enrollments
-            WHERE enrollments.student_number = %s
-            GROUP BY enrollments.student_number;
+            SELECT c.name AS class_name, COUNT(*) AS attendance_count
+            FROM enrollments e
+            JOIN classes c ON e.class_id = c.id
+            WHERE e.student_id = (
+                SELECT id FROM students WHERE student_number = %s
+            )
+            GROUP BY c.name
         """, (student_number,))
 
         records = cursor.fetchall()
@@ -245,15 +252,12 @@ def get_overall_attendance(student_number):
         connection.close()
 
         if not records:
-            return jsonify({"message": "No attendance records found for the specified student."}), 404
+            return jsonify({"message": "No attendance records found"}), 404
 
-        attendance_data = [{"student_number": student_number, "attendance_count": count} for student_number, count in records]
-        return jsonify(attendance_data)
+        return jsonify([{"class_name": r[0], "attendance_count": r[1]} for r in records])
 
     except Exception as e:
-        print("Error:", str(e))
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/analytics/daily-trends', methods=['GET'])
 def get_daily_trends():
