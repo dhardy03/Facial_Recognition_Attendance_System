@@ -1,85 +1,114 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, LineChart, Line} from "recharts";
 
-function Analytics() {
-    const [attendanceData, setAttendanceData] = useState([]);
-    const [studentAttendance, setStudentAttendance] = useState([]);
-        const [students, setStudents] = useState([]);
-    const [selectedStudent, setSelectedStudent] = useState([]);
+function AttendanceInsights() {
+    const [students, setStudents] = useState([]);
+    const [selectedStudent, setSelectedStudent] = useState("");
+    const [studentAttendance, setStudentAttendance] = useState(null);
+    const [dailyTrends, setDailyTrends] = useState([]);
+    const [classWiseAttendance, setClassWiseAttendance] = useState([]);
 
-    // Fetch attendance per module (stacked bar chart)
-    useEffect(() => {
-        axios.get("http://localhost:5000/analytics")
-            .then(response => setAttendanceData(response.data))
-            .catch(error => console.error("Error fetching attendance by module:", error));
-    }, []);
-
-    // Fetch attendance by student
     useEffect(() => {
         axios.get("http://localhost:5000/analytics/students")
-            .then(response => setStudentAttendance(response.data))
-            .catch(error => console.error("Error fetching attendance by student:", error));
+            .then(response => setStudents(response.data))
+            .catch(error => console.error("Error fetching student list:", error));
+
+        axios.get("http://localhost:5000/analytics/daily-trends")
+            .then(response => setDailyTrends(response.data))
+            .catch(error => console.error("Error fetching daily trends:", error));
+
+        axios.get("http://localhost:5000/analytics/class-wise")
+            .then(response => setClassWiseAttendance(response.data))
+            .catch(error => console.error("Error fetching class-wise attendance:", error));
     }, []);
 
     useEffect(() => {
         if (selectedStudent) {
-            axios.get(`http://localhost:5000/analytics/${selectedStudent}`)
-                .then(response => setAttendanceData(response.data))
-                .catch(error => console.error("Error fetching attendance:", error));
+            axios.get(`http://localhost:5000/analytics/overall/${selectedStudent}`)
+                .then(response => setStudentAttendance(response.data))
+                .catch(error => console.error("Error fetching student attendance:", error));
         }
     }, [selectedStudent]);
 
+
     return (
-        <div>
-            <h2>Attendance Overview</h2>
+<div className="container py-5">
+            <div className="header text-center p-4" style={{ backgroundColor: "#d30031", color: "white", borderRadius: "8px" }}>
+                <h2>Attendance Insights</h2>
+            </div>
 
-            {/* Stacked Bar Chart for Attendance per Module */}
-            <h3>Attendance per Module</h3>
-            {attendanceData.length > 0 && (
-                <BarChart width={700} height={400} data={attendanceData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="class_name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    {Object.keys(attendanceData[0]).filter(k => k !== "class_name").map((name, index) => (
-                        <Bar key={name} dataKey={name} stackId="a" fill={getColor(index)} />
-                    ))}
-                </BarChart>
-            )}
-
-            {/* Bar Chart for Attendance by Student */}
-            <h3>Attendance by Student</h3>
-            {studentAttendance.length > 0 && (
-                <BarChart width={700} height={400} data={studentAttendance}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="attendance" fill="#82ca9d" />
-                </BarChart>
-            )}
-
-            <div>
-                <label>Select Student</label>
-                <select onChange={(e) => setSelectedStudent(e.target.value)}>
-                    <option value="">Select a student</option>
+            <div className="bg-light p-4 mt-3 rounded shadow">
+                <h3 className="text-center">Select Student</h3>
+                <div className="text-center mt-4">
+                    <label className="fw-bold">Student:</label>
+                    <select
+                        className="form-select w-50 mx-auto mt-2"
+                        value={selectedStudent}
+                        onChange={(e) => setSelectedStudent(e.target.value)}
+                    >
                     {students.map(student => (
-                        <option key={student.id} value={student.id}>
-                            {student.name}
-                        </option>
-                    ))}
-                </select>
+                    <option key={student.student_number} value={student.student_number}>
+                        {student.first_name} {student.last_name} ({student.student_number})
+                    </option>
+                ))}
+                    </select>
+                </div>
+            </div>
+
+
+
+            {studentAttendance && studentAttendance.length > 0 && (
+            <div className="bg-light p-4 mt-3 rounded shadow">
+                <h3 className="text-center">Attendance for Student {studentAttendance[0].student_number}</h3>
+                <div className="d-flex justify-content-center">
+                    <BarChart width={600} height={400} data={studentAttendance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="class_name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="attendance_count" fill="#8884d8" />
+                    </BarChart>
+                </div>
+            </div>
+            )}
+
+
+            <div className="bg-light p-4 mt-3 rounded shadow">
+                <h3 className="text-center">Daily Attendance Trends</h3>
+                {dailyTrends.length > 0 && (
+                    <div className="d-flex justify-content-center">
+                        <LineChart width={700} height={400} data={dailyTrends}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Line type="monotone" dataKey="attendance" stroke="#8884d8" strokeWidth={2} />
+                        </LineChart>
+                    </div>
+                )}
+            </div>
+
+            {/* Class-wise Attendance */}
+            <div className="bg-light p-4 mt-3 rounded shadow">
+                <h3 className="text-center">Class-wise Attendance</h3>
+                {classWiseAttendance.length > 0 && (
+                    <div className="d-flex justify-content-center">
+                        <BarChart width={700} height={400} data={classWiseAttendance}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="class_name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="attendance" fill="#82ca9d" />
+                        </BarChart>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-// Function to assign different colors to students in the stacked chart
-const getColor = (index) => {
-    const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#8dd1e1"];
-    return colors[index % colors.length];
-};
-
-export default Analytics;
+export default AttendanceInsights;

@@ -5,8 +5,8 @@ import pickle
 def get_db_connection():
     try:
         connection = mysql.connector.connect(
-            host="192.168.1.208",
-            user="dan",
+            host="localhost",
+            user="root",
             passwd="12345678",
             database="face_recognition",
         )
