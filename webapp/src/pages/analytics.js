@@ -1,26 +1,16 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, LineChart, Line} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend} from "recharts";
 
 function AttendanceInsights() {
     const [students, setStudents] = useState([]);
     const [selectedStudent, setSelectedStudent] = useState("");
     const [studentAttendance, setStudentAttendance] = useState(null);
-    const [dailyTrends, setDailyTrends] = useState([]);
-    const [classWiseAttendance, setClassWiseAttendance] = useState([]);
 
     useEffect(() => {
         axios.get("http://localhost:5000/analytics/students")
             .then(response => setStudents(response.data))
             .catch(error => console.error("Error fetching student list:", error));
-
-        axios.get("http://localhost:5000/analytics/daily-trends")
-            .then(response => setDailyTrends(response.data))
-            .catch(error => console.error("Error fetching daily trends:", error));
-
-        axios.get("http://localhost:5000/analytics/class-wise")
-            .then(response => setClassWiseAttendance(response.data))
-            .catch(error => console.error("Error fetching class-wise attendance:", error));
     }, []);
 
     useEffect(() => {
@@ -33,7 +23,7 @@ function AttendanceInsights() {
 
 
     return (
-<div className="container py-5">
+        <div className="container py-5">
             <div className="header text-center p-4" style={{ backgroundColor: "#d30031", color: "white", borderRadius: "8px" }}>
                 <h2>Attendance Insights</h2>
             </div>
@@ -56,8 +46,6 @@ function AttendanceInsights() {
                 </div>
             </div>
 
-
-
             {studentAttendance && studentAttendance.length > 0 && (
             <div className="bg-light p-4 mt-3 rounded shadow">
                 <h3 className="text-center">Attendance for Student {studentAttendance[0].student_number}</h3>
@@ -73,40 +61,6 @@ function AttendanceInsights() {
                 </div>
             </div>
             )}
-
-
-            <div className="bg-light p-4 mt-3 rounded shadow">
-                <h3 className="text-center">Daily Attendance Trends</h3>
-                {dailyTrends.length > 0 && (
-                    <div className="d-flex justify-content-center">
-                        <LineChart width={700} height={400} data={dailyTrends}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Line type="monotone" dataKey="attendance" stroke="#8884d8" strokeWidth={2} />
-                        </LineChart>
-                    </div>
-                )}
-            </div>
-
-            {/* Class-wise Attendance */}
-            <div className="bg-light p-4 mt-3 rounded shadow">
-                <h3 className="text-center">Class-wise Attendance</h3>
-                {classWiseAttendance.length > 0 && (
-                    <div className="d-flex justify-content-center">
-                        <BarChart width={700} height={400} data={classWiseAttendance}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="class_name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="attendance" fill="#82ca9d" />
-                        </BarChart>
-                    </div>
-                )}
-            </div>
         </div>
     );
 }

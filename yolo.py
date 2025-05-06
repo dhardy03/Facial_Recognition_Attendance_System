@@ -1,4 +1,6 @@
+import csv
 import os
+from datetime import datetime
 import face_recognition
 import torch
 import cv2
@@ -54,13 +56,17 @@ def load_known_faces(folder_path):
     return known_face_encodings, known_face_names, known_face_ids
 
 
-def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_names, known_face_ids,
+def detect_and_recognise_faces(model, frame, known_face_encodings, known_face_names, known_face_ids,
                                conf_threshold=0.5):
     print("Starting face detection and recognition...")
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = model(frame_rgb)
     detections = results.pandas().xyxy[0]
     recognized_students = []
+
+    TP = 0
+    FP = 0
+    FN = 0
 
     for _, row in detections.iterrows():
         if row['confidence'] >= conf_threshold:
@@ -89,8 +95,27 @@ def detect_and_recognize_faces(model, frame, known_face_encodings, known_face_na
                             print(f"Match found: {name} (ID: {student_id}) at ({x1}, {y1}), ({x2}, {y2})")
                             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                             cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        TP += 1
+                    else:
+                        FP += 1
+                else:
+                    FN += 1
+
+    precision = TP / (TP + FP) if TP + FP > 0 else 0
+    recall = TP / (TP + FN) if TP + FN > 0 else 0
+    f1_score = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
 
     print("Face detection and recognition complete.")
+    print(f"Precision: {precision:.2f}, Recall: {recall:.2f}, F1-Score: {f1_score:.2f}")
+
+    csv_file = 'performance_metrics.csv'
+    file_exists = os.path.isfile(csv_file)
+    with open(csv_file, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(['Timestamp', 'Precision', 'Recall', 'F1-Score'])
+        writer.writerow([datetime.now().isoformat(), f"{precision:.2f}", f"{recall:.2f}", f"{f1_score:.2f}"])
+
     _, buffer = cv2.imencode('.jpg', frame)
     processed_image_base64 = base64.b64encode(buffer).decode('utf-8')
     return processed_image_base64, recognized_students

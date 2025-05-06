@@ -46,3 +46,10 @@
   color: white;
   text-align: center;
 }
+
+.nav-item.dropdown:hover .dropdown-menu {
+  display: block;
+}
+.navbar .dropdown-menu {
+  margin-top: 0;
+}

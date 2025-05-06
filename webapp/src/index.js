@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";  // ✅ Make sure App.js is imported
+import App from "./App";
 import "./index.css";
 import reportWebVitals from "./reportWebVitals";
 
@@ -10,5 +10,13 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('Service Worker registered:', reg))
+      .catch(err => console.error('Service Worker registration failed:', err));
+  });
+}
 
 reportWebVitals();
