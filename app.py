@@ -7,7 +7,7 @@ import base64
 import os
 import face_recognition
 from PIL import Image
-from yolo import load_yolo_model, detect_and_recognize_faces, load_known_faces
+from yolo import load_yolo_model, detect_and_recognise_faces, load_known_faces
 from database import get_db_connection, save_face_db
 
 app = Flask(__name__)
@@ -154,7 +154,7 @@ def process_frame():
             print("ERROR: Failed to decode image.")
             return jsonify({"error": "Failed to decode image"}), 400
 
-        processed_image_base64, recognized_students = detect_and_recognize_faces(model, frame, known_face_encodings,
+        processed_image_base64, recognized_students = detect_and_recognise_faces(model, frame, known_face_encodings,
                                                                                  known_face_names, known_face_ids)
 
         if not processed_image_base64:
@@ -230,33 +230,33 @@ def get_overall_attendance(student_number):
         connection = get_db_connection()
         cursor = connection.cursor()
 
-        # First validate student_number exists
-        cursor.execute("SELECT id FROM students WHERE student_number = %s", (student_number,))
-        student = cursor.fetchone()
-        if not student:
-            return jsonify({"error": "Student not found"}), 404
-
-        # Get class attendance using student_number
         cursor.execute("""
-            SELECT c.name AS class_name, COUNT(*) AS attendance_count
-            FROM enrollments e
-            JOIN classes c ON e.class_id = c.id
-            WHERE e.student_id = (
-                SELECT id FROM students WHERE student_number = %s
-            )
-            GROUP BY c.name
-        """, (student_number,))
+                SELECT c.name AS class_name, COUNT(*) AS attendance_count, s.student_number
+                FROM enrollments e
+                JOIN students s ON e.student_id = s.id
+                JOIN classes c ON e.class_id = c.id
+                WHERE s.student_number = %s
+                GROUP BY c.name, s.student_number
+                ORDER BY attendance_count DESC;
+            """, (student_number,))
 
-        records = cursor.fetchall()
+        rows = cursor.fetchall()
         cursor.close()
         connection.close()
 
-        if not records:
-            return jsonify({"message": "No attendance records found"}), 404
+        data = [
+            {
+                "class_name": row[0],
+                "attendance_count": row[1],
+                "student_number": row[2]
+            } for row in rows
+        ]
 
-        return jsonify([{"class_name": r[0], "attendance_count": r[1]} for r in records])
+        return jsonify(data)
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/analytics/daily-trends', methods=['GET'])
@@ -283,30 +283,39 @@ def get_daily_trends():
         print("Error:", str(e))
         return jsonify({"error": str(e)}), 500
 
-@app.route('/analytics/class-wise', methods=['GET'])
-def get_classwise_attendance():
+@app.route('/analytics/overall-module-attendance', methods=['GET'])
+def get_overall_module_attendance():
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
 
         cursor.execute("""
-            SELECT classes.name AS class_name, COUNT(*) AS attendance
-            FROM enrollments
-            JOIN classes ON enrollments.class_id = classes.id
-            GROUP BY classes.name
-            ORDER BY classes.name;
+            SELECT c.name AS class_name, COUNT(*) AS attendance_count
+            FROM enrollments e
+            JOIN classes c ON e.class_id = c.id
+            GROUP BY c.name
+            ORDER BY attendance_count DESC
         """)
+        results = cursor.fetchall()
 
-        records = cursor.fetchall()
         cursor.close()
         connection.close()
 
-        class_attendance = [{"class_name": class_name, "attendance": count} for class_name, count in records]
-        return jsonify(class_attendance)
+        data = [
+            {"class_name": row[0], "attendance_count": row[1]}
+            for row in results
+        ]
+
+        return jsonify(data)
 
     except Exception as e:
-        print("Error:", str(e))
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+
+#runs code indefinitely
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
+
