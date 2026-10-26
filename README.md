@@ -5,7 +5,7 @@
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 | Category | Highlights                                                                                 |
 |----------|--------------------------------------------------------------------------------------------|
@@ -15,7 +15,7 @@
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -32,7 +32,7 @@ flowchart TD
 
 ---
 
-## 🚀 Quick Start (local dev)
+## Quick Start (local dev)
 
 ### 1. Clone & configure
 ```bash
